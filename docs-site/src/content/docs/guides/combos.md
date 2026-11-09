@@ -800,7 +800,10 @@ is recorded as failed and the combo may try its next eligible target. A zero-out
 `response.incomplete` follows the same path when its reason is missing or is `adapter_eof`,
 `missing_terminal_event`, or `upstream_stall_timeout`. Explicit semantic reasons such as
 `max_output_tokens` and `content_filter` remain terminal, as does an explicit null reason.
-A reasonless final snapshot that already contains output items is also kept. Once any output event begins,
+A reasonless final snapshot that already contains output items is also kept. The rate-limit and
+response-metadata frames that a native Codex (ChatGPT account) target sends over its WebSocket are
+not output, so an overload error that follows them with no output still moves to the next target.
+Once any output event begins,
 the target is committed: a later stream failure is returned to the client and is never replayed on
 another provider, which prevents duplicate text and tool execution. If the pre-output buffer reaches
 its safety cap without a terminal or output boundary, OpenCodex also commits the current target
@@ -1043,13 +1046,15 @@ Every target is currently ineligible: for example, its provider is disabled, it 
 it has already been attempted for this request, or an encrypted v2 task excludes it. Check target
 provider state and recent upstream errors. When no target was attempted, the error message lists
 why each target was skipped, for example
-`No available targets for combo: fast (openai/gpt-6: quota exhausted; anthropic/claude-opus-5-5: cooldown 42s)`.
+`No available targets for combo (2 targets; target 1 (openai): quota exhausted; target 2 (anthropic): cooldown)`. The client error names targets by position and provider only; the service log records the target's position and provider when it fails or when the proxy waits out its cooldown.
 For cooldowns, follow an observed `Retry-After` value first;
 Codex reset headers also take precedence over `cooldownMs`.
 If neither upstream signal is usable, the configured `cooldownMs` applies, or the upstream fallback applies
 when it is unset (5 seconds for request-rate codes `1302`/`1305`, 10 minutes for a spent usage
 window or a credential/billing failure, otherwise 60 seconds). Explicit
 `Retry-After` delays are capped at 24 hours; the other cooldowns are capped at 10 minutes.
+
+Validation errors (HTTP 400/422) that quote quota or free-tier cap text do not trigger fallback by that text alone. A structured `free_rate_limited` refusal still tries the next eligible target without cooling the healthy provider or target.
 
 ### Why was my alias rejected?
 

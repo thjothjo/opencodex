@@ -24,7 +24,19 @@ while empty installation and turn-metadata headers retain their existence gates.
 `src/codex/forward-transport-headers.ts` also isolates a present installation field inside native
 turn metadata and strips caller attestations from substituted credentials. Its selected-header merge
 prevents removed identity fields from reappearing through provider defaults.
-Pool turn metadata is bounded to 32 KiB of UTF-8. Larger values refuse the send with the same
+For an object with a nonblank string `installation_id`, including one already matching the selected
+identity, turn-metadata JSON is canonicalized and escapes every code unit outside
+printable ASCII: `JSON.stringify` escapes U+0000–U+001F (with short forms such as `\n` and
+`\t` where JSON defines them, `\uXXXX` otherwise), and U+007F and above become `\uXXXX`. The
+header stays a valid HTTP field value and JSON-decodes to the same metadata; the client-metadata
+copy uses the same form. Pool turn metadata is bounded to 32 KiB of canonical UTF-8, measured on
+the unescaped rewritten JSON, and the escaped output is capped at 96 KiB (escaping grows
+non-ASCII text at most threefold; DEL-heavy values past the cap are refused). Raw input above
+96 KiB is refused before parsing. Invalid JSON, non-objects, and objects without a nonblank string
+`installation_id` pass through unchanged up to 32 KiB raw and are not guaranteed header-safe.
+Because the bound is on canonical JSON, an accepted escaped value re-enters unchanged, so the
+Responses path can isolate it during auth materialization and again in the policy recheck.
+Larger values refuse the send with the same
 sanitized identity error instead of passing unprojected bytes through; main and main-pool
 retain their original values. Routed compact handoffs preserve present empty installation and
 turn-metadata headers, so the final selected account applies the same rule as a direct send.
@@ -56,6 +68,10 @@ same context. `src/server/index/websocket-handler.ts` and `src/server/index/live
 apply Pool projection at every immediate or queued upstream frame send, including JSON carried
 in binary frames. Unchanged frames retain their original bytes and encoding; derivation failure
 closes the relay with a sanitized reason without forwarding the failed frame or the queue tail.
+New inbound Responses inference turns retain the handshake's parent/thread headers and pass through
+the same workflow admission as HTTP before dispatch or native control ownership. Their workflow
+lease follows the active turn through terminal output and cancellation; an admission refusal is
+framed as the same local 429, including its workflow-refusal header.
 The optional availability probe in `src/server/claude-messages.ts` treats an installation-identity
 failure as helper unavailability, allowing an independent native Messages route to continue.
 `src/codex/affinity-debug.ts` reports only process-local keyed equality tags, never raw identities.
@@ -70,3 +86,5 @@ Authenticated live and frame contracts are covered by
 `tests/codex-integration/codex-installation-live-ws.test.ts`; compact empty-header and turn-size
 contracts are covered by `tests/responses/codex-installation-compact-empty.test.ts` and
 `tests/responses/codex-installation-turn-limit.test.ts`.
+
+The Claude bridge carries its private pool identity through Codex selection; see [Claude affinity](../data-planes/inbound-compat.md#claude-affinity-at-final-go-dispatch).
