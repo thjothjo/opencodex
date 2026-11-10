@@ -195,7 +195,7 @@ carried through; `bin/ocx.mjs` rediscovers bundled or validated PATH Bun, stampi
 `process` via `src/lib/bun-path-runtime.mjs`. The API-auth token remains file-backed and is loaded only by
 the service shell at start. On macOS, `start` and detailed `status` compare the live launchd job
 against `expectedLaunchdCommand`, which still follows a `launcherPath` recorded by a pre-pinning
-install rather than re-walking PATH, so such a job is never misreported as an older plist (#3464). On macOS, `src/service/launchd.ts` waits up to 125 probes at 200 ms intervals for an evicted job to disappear before repair bootstraps its replacement. The bounded 25-second window accommodates the proxy drain and launchd shutdown; exhausted or unreadable registration retains the existing diagnostic failure path (`tests/service/launchd-repair.test.ts`).
+install rather than re-walking PATH, so such a job is never misreported as an older plist (#3464). On macOS, `src/service/launchd.ts` waits up to 125 probes at 200 ms intervals for an evicted job to disappear before repair bootstraps its replacement. The bounded 25-second window accommodates the proxy drain and launchd shutdown; exhausted or unreadable registration retains the existing diagnostic failure path (`tests/service/launchd-repair.test.ts`). A teardown `launchctl print` cannot see — a job booted out by hand an instant earlier is already unregistered while its process is still exiting — is waited out by the recovery round: up to 50 bootstrap attempts at 500 ms intervals, retried only on the transient `5`/`37`/`Load failed` shapes, so `bootout` followed by one `ocx service restart` or `repair` serves on the first call (#8362).
 
 > Decision record: [ADR-0030](../decisions/ADR-0030-stable-service-launcher-launchd-and-systemd.md)
 > Decision record: [ADR-0100](../decisions/ADR-0100-stable-service-launcher-launchd-and-systemd.md)
@@ -382,7 +382,7 @@ Pool quota producers and account commands follow the [bounded raw-observation co
 
 Account quota surfaces use [safe probe diagnostics](../transports/inventory.md#account-quota-failure-diagnostics) separately from quota validity, credential health and routing authority.
 
-Combo child requests normalize effort and thinking controls against the selected target while retaining reasoning summaries; strict unknown targets preserve caller controls. The [Responses transport owner](../transports/responses.md) documents this boundary, and native Chat also honors explicit per-axis capability declarations; an initial JEV null choice separately strips caller effort.
+Combo child requests normalize effort and thinking controls against the selected target while retaining reasoning summaries; strict unknown targets preserve caller controls. The [Responses transport owner](../transports/responses.md) documents this boundary, and native Chat also honors explicit per-axis capability declarations; in the default `decide` mode an initial JEV null choice separately strips caller effort.
 
 Live sideband admission and its bounded upstream handshake follow the [runtime contract](../runtime.md#live-sideband-handshake); the ordinary Responses WebSocket exchange remains separate.
 

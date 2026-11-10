@@ -61,7 +61,7 @@ route-specific results rather than repeating this table.
 | --- | --- | --- |
 | 401 | `opencodex admin token required` | The admin token or GUI session is missing, invalid, expired, origin-mismatched, or missing CSRF evidence |
 | 403 | `cross-origin request blocked` | The request origin is outside the management allowlist |
-| 403 | `cross-origin request blocked` with `code: "remember_requires_direct_origin"` | `POST /api/session/remember` only: this dashboard address cannot hold a remembered device (for example a standalone dashboard behind a TLS-terminating proxy); sign in without Remember |
+| 403 | `code: "remember_requires_direct_origin"` | `POST /api/session/remember` only: this dashboard address cannot hold a remembered device (for example a standalone dashboard behind a TLS-terminating proxy); sign in without Remember. The `error` text is `cross-origin request blocked` when the origin check refuses the request, and `Remember requires a direct HTTPS dashboard (or loopback) and matching Origin` when the origin check allows the request but the route still refuses it, for example because the address is not a direct HTTPS or loopback dashboard or no matching `Origin` header was sent; match on `code` |
 | 404 | `not_found` | No management route matched the method and path |
 | 413 | `request body too large` | A POST, PUT, or PATCH body exceeds the 2 MiB management limit |
 | 503 | `management API unavailable` | Admin credential initialization or hardening is unavailable |
@@ -683,6 +683,7 @@ Labels are read on login/import or refresh, never inferred from quota percentage
 | `GET, POST, DELETE /api/providers/keys` | List masked provider keys, add/activate one, or remove one | 400 invalid input; 404 provider/key missing |
 | `PUT /api/providers/keys/active` | Select a provider's active key | 400 invalid input; 404 provider/key missing |
 | `PUT /api/providers/keys/alias` | Set or clear a provider-key alias | 400 invalid input; 404 provider/key missing |
+| `PUT /api/providers/keys/pause` | Pause or resume one provider API key. Body `{ name, id, paused }`; pausing the active key selects the next usable key in ring order. Success includes the resulting `activeAccountId` (or `null`) and `activeAccountChanged`. | 400 invalid input; 404 provider/key missing |
 | `GET, POST, PATCH, DELETE /api/keys` | List, create, edit, or delete data-plane admission keys | 400 invalid body/id; 404 key missing |
 | `PUT /api/oauth/accounts/affinity-reset` | Confirm a provider-wide session-affinity reset without requiring an account. Body `{ provider }`; success includes `affinityResetConfirmed: true`. CLI: `ocx account reset-affinity anthropic --json` (`anthropic2` supported). | 400 invalid body/provider; 503 `affinity_reset_not_persisted`, `retryable: true` |
 
